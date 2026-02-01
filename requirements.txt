@@ -1,6 +1,12 @@
-streamlit>=1.32.0
-google-generativeai
-numpy
-pandas
-folium
-streamlit-folium
+
+Updated requirements.txt (minimal, add production OAuth dependencies when you integrate real Google OAuth):
+```text name=requirements.txt
+streamlit>=1.26
+google-generativeai>=0.12
+numpy>=1.25
+pandas>=2.0
+folium>=0.14
+streamlit-folium>=0.12
+geocoder>=1.38
+authlib>=1.2    # for OAuth flows (optional, replace with preferred OAuth lib)
+pyjwt>=2.8      # token handling (optional)
