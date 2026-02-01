@@ -1,348 +1,376 @@
 import json
 import re
+import time
 import math
-import numpy as np
 from typing import Any, Dict, Optional
 
+import numpy as np
 import streamlit as st
 import google.generativeai as genai
 
-# -----------------------
-# PAGE CONFIG
-# -----------------------
-st.set_page_config(page_title="Bharat Suraksha AI — Cyber Secure", page_icon="🛡️", layout="wide")
+# ---------------------------
+# Page configuration
+# ---------------------------
+st.set_page_config(page_title="Bharat Suraksha — CyberSecure", page_icon="🛡️", layout="wide")
 
-# -----------------------
-# GLASSMORPHISM + THEME CSS
-# -----------------------
+# ---------------------------
+# Neon-Glass + Ashoka Chakra CSS (Glassmorphism + animated chakra)
+# ---------------------------
 st.markdown(
     """
     <style>
     :root{
-        --glass-bg: rgba(255,255,255,0.03);
-        --glass-border: rgba(255,255,255,0.06);
         --neon-saffron: #FF9933;
         --neon-green: #39FF14;
-        --accent-blue: #00bcd4;
+        --glass-bg: rgba(10,12,20,0.45);
+        --glass-border: rgba(255,255,255,0.06);
+        --accent-blue: #0ea5ff;
     }
-    /* Page background */
+    /* Page bg */
     .stApp {
-        background: linear-gradient(180deg,#020617 0%, #0b1020 100%);
-        color: #e6eef8;
+        background: radial-gradient(ellipse at top left, #071025 0%, #020617 60%);
+        color: #e9f2ff;
     }
     /* Glass card */
     .glass {
         background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
         border: 1px solid var(--glass-border);
-        backdrop-filter: blur(8px) saturate(140%);
         border-radius: 14px;
         padding: 18px;
-        box-shadow: 0 6px 30px rgba(0,0,0,0.5);
+        backdrop-filter: blur(8px) saturate(130%);
+        box-shadow: 0 6px 30px rgba(0,0,0,0.6);
     }
-    /* Neon accents */
-    .neon-btn {
+    /* Neon buttons */
+    .neon {
         background: linear-gradient(90deg, var(--neon-saffron), var(--neon-green));
-        color: #001011 !important;
+        color: #081010 !important;
         border-radius: 10px;
-        padding: 10px 14px;
+        padding: 8px 12px;
         font-weight: 700;
-        transition: transform 0.12s ease, box-shadow 0.12s ease;
-        box-shadow: 0 6px 18px rgba(57,255,20,0.06);
     }
-    .neon-btn:hover{
-        transform: translateY(-3px);
-        box-shadow: 0 12px 30px rgba(255,153,51,0.12);
+    .neon:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(255,153,51,0.12); }
+    /* Badge for results */
+    .badge {
+        padding: 10px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-align: center;
+        color: #001010;
     }
-    /* Buttons */
-    div.stButton > button:first-child {
-        width: 100%;
+    /* Ashoka Chakra animation */
+    .chakra {
+        width: 68px;
+        height: 68px;
+        margin: 0 auto 8px auto;
+        border-radius: 50%;
+        border: 4px solid rgba(255,255,255,0.06);
+        position: relative;
+        box-shadow: 0 0 18px rgba(57,255,20,0.02);
+        animation: spin 2.6s linear infinite;
     }
-    /* Small responsive tweaks */
-    @media (max-width: 600px) {
+    .chakra:after{
+        content: '';
+        position: absolute;
+        inset: 9px;
+        border-radius: 50%;
+        border: 4px dashed rgba(255,153,51,0.18);
+    }
+    @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+    /* Responsive tweaks */
+    @media (max-width: 640px) {
         .glass { padding: 12px; border-radius: 10px; }
     }
-    /* Progress bar color override */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, var(--neon-saffron), var(--neon-green))!important;
-    }
+    /* Progress bar style */
+    .stProgress > div > div > div > div { background: linear-gradient(90deg, var(--neon-saffron), var(--neon-green)) !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# -----------------------
-# MULTILINGUAL DICTIONARY
-# -----------------------
-MULTI = {
+# ---------------------------
+# Universal language dictionary
+# ---------------------------
+LANG = {
     "English": {
-        "title": "🛡️ Bharat Suraksha AI — Cyber Secure",
-        "subtitle": "Protecting India from social-engineering & digital scams",
+        "title": "🛡️ Bharat Suraksha — Cyber Secure",
+        "subtitle": "Detecting social engineering, phishing & scams across Indian contexts",
         "paste_prompt": "Paste the suspicious message, SMS, or WhatsApp text here:",
-        "scan_button": "🔍 Scan for Scams",
+        "scan_button": "🔍 Analyze (Deep Intent)",
         "analysis_result": "Analysis Result",
-        "emergency_action": "🚨 Emergency Action",
+        "analyzing_superposition": "Analyzing Superposition (Quantum Digital Dharma)...",
+        "please_paste": "Please paste a message first!",
+        "emergency_action": "🚨 Emergency Actions",
         "call_1930": "Call 1930 Helpline",
         "report_cyber": "Report to Cybercrime.gov.in",
         "report_chakshu": "Report to Chakshu (Sanchar Saathi)",
         "chakshu_cta": "Report forged KYC / SIM / SMS scams to Sanchar Saathi",
-        "analyzing": "Analyzing with Digital Dharma...",
-        "please_paste": "Please paste a message first!",
-        "upload_key": "Provide your User Gemini API Key (session only)",
-        "use_secrets": "Use app-level key from Streamlit Secrets",
-        "quantum_title": "Quantum 'Digital Dharma' Simulation",
-        "quantum_explain": "Superposition visualized; final result collapses combining AI confidence & quantum simulation.",
-        "raw_response": "Raw model response (debug)",
-        "login": "Sign in with Google (placeholder)",
-        "logout": "Sign out"
+        "raw_response": "Raw model response",
+        "upload_key": "User Gemini API Key (session only)",
+        "use_app_key": "Use app-level key from Streamlit Secrets",
+        "login": "Sign in (simulated)",
+        "logout": "Sign out",
+        "quantum_result": "Quantum collapse indicates:",
+        "safe": "SAFE",
+        "scam": "SCAM",
+        "unknown": "SUSPECT",
+        "social_tactics": "Social Engineering Tactics detected",
+        "matched_patterns": "Matched patterns",
     },
     "Hindi": {
-        "title": "🛡️ भारत सुरक्षा AI — साइबर सिक्योर",
-        "subtitle": "सोशल-इंजीनियरिंग और डिजिटल स्कैम से सुरक्षा",
-        "paste_prompt": "संदेहास्पद संदेश, SMS, या WhatsApp टेक्स्ट यहाँ पेस्ट करें:",
-        "scan_button": "🔍 स्कैम के लिए स्कैन करें",
+        "title": "🛡️ भारत सुरक्षा — साइबर सुरक्षित",
+        "subtitle": "सोशल इंजीनियरिंग, फ़िशिंग और भारतीय संदर्भों में स्कैम का पता लगाएँ",
+        "paste_prompt": "संदेहास्पद संदेश, SMS या WhatsApp टेक्स्ट यहाँ पेस्ट करें:",
+        "scan_button": "🔍 विश्लेषण (डीप इंटेंट)",
         "analysis_result": "विश्लेषण परिणाम",
-        "emergency_action": "🚨 आपातकालीन कार्रवाई",
+        "analyzing_superposition": "सुपरपोजीशन विश्लेषण (क्वांटम डिजिटल धर्मा)...",
+        "please_paste": "कृपया पहले एक संदेश पेस्ट करें!",
+        "emergency_action": "🚨 आपातकालीन क्रियाएँ",
         "call_1930": "1930 हेल्पलाइन कॉल करें",
         "report_cyber": "Cybercrime.gov.in पर रिपोर्ट करें",
-        "report_chakshu": "Chakshu को रिपोर्ट करें (Sanchar Saathi)",
+        "report_chakshu": "Chakshu (Sanchar Saathi) को रिपोर्ट करें",
         "chakshu_cta": "नकली KYC / SIM / SMS स्कैम Sanchar Saathi पर रिपोर्ट करें",
-        "analyzing": "डिजिटल धर्मा के साथ विश्लेषण कर रहे हैं...",
-        "please_paste": "कृपया पहले एक संदेश पेस्ट करें!",
-        "upload_key": "अपना User Gemini API Key प्रदान करें (केवल सत्र)",
-        "use_secrets": "Streamlit Secrets से ऐप-स्तरीय कुंजी का उपयोग करें",
-        "quantum_title": "क्वांटम 'डिजिटल धर्मा' सिमुलेशन",
-        "quantum_explain": "सुपरपोजीशन दिखाएँ; अंतिम परिणाम AI आत्मविश्वास और क्वांटम सिमुलेशन को मिलाता है।",
-        "raw_response": "कच्चा मॉडल प्रतिक्रिया (डिबग)"
+        "raw_response": "कच्ची मॉडल प्रतिक्रिया",
+        "upload_key": "User Gemini API Key (सिर्फ सत्र के लिए)",
+        "use_app_key": "Streamlit Secrets से ऐप-स्तरीय कुंजी का उपयोग करें",
+        "login": "साइन इन (नकली)",
+        "logout": "साइन आउट",
+        "quantum_result": "क्वांटम कोलैप्स बताता है:",
+        "safe": "सुरक्षित",
+        "scam": "ठगाई",
+        "unknown": "संदिग्ध",
+        "social_tactics": "पाए गए सोशल इंजीनियरिंग रणनीतियाँ",
+        "matched_patterns": "मिलते पैटर्न",
     },
     "Bengali": {
-        "title": "🛡️ Bharat Suraksha AI — সাইবার সুরক্ষা",
-        "subtitle": "সামাজিক প্রকৌশল ও ডিজিটাল ঠকবাজি থেকে সুরক্ষা",
-        "paste_prompt": "সন্দেহজনক বার্তা, SMS বা WhatsApp টেক্সট এখানে পেস্ট করুন:",
-        "scan_button": "🔍 স্ক্যানে করুন",
+        "title": "🛡️ Bharat Suraksha — সাইবার সিকিউর",
+        "subtitle": "সামাজিক প্রকৌশল, ফিশিং এবং ভারতীয় স্ক্যাম সনাক্তকরণ",
+        "paste_prompt": "সন্দেহপূর্ণ বার্তা, SMS বা WhatsApp টেক্সট এখানে পেস্ট করুন:",
+        "scan_button": "🔍 বিশ্লেষণ (গভীর অভিপ্রায়)",
         "analysis_result": "বিশ্লেষণ ফলাফল",
-        "emergency_action": "🚨 জরুরি ক্রিয়া",
+        "analyzing_superposition": "সুপারপজিশন বিশ্লেষণ (কোয়ান্টাম ডিজিটাল ধর্মা)...",
+        "please_paste": "অনুগ্রহ করে প্রথমে একটি বার্তা পেস্ট করুন!",
+        "emergency_action": "🚨 জরুরি কর্ম",
         "call_1930": "1930 হেল্পলাইন কল করুন",
         "report_cyber": "Cybercrime.gov.in-এ রিপোর্ট করুন",
         "report_chakshu": "Chakshu-এ রিপোর্ট করুন (Sanchar Saathi)",
-        "chakshu_cta": "নকল KYC / SIM / SMS ঠকবাজি Sanchar Saathi-তে রিপোর্ট করুন",
-        "analyzing": "ডিজিটাল ধর্মা দিয়ে বিশ্লেষণ চলছে...",
-        "please_paste": "অনুগ্রহ করে প্রথমে একটি বার্তা পেস্ট করুন!",
-        "upload_key": "আপনার User Gemini API Key প্রদান করুন (শুধু সেশন)",
-        "use_secrets": "Streamlit Secrets থেকে অ্যাপ-স্তরের কী ব্যবহার করুন",
-        "quantum_title": "কোয়ান্টাম 'ডিজিটাল ধর্মা' সিমুলেশন",
-        "quantum_explain": "সুপারপজিশন দেখানো হচ্ছে; চূড়ান্ত ফলাফল AI আত্মবিশ্বাস এবং কোয়ান্টাম সিমুলেশনকে একত্রিত করে।",
-        "raw_response": "কাঁচা মডেল প্রতিক্রিয়া (ডিবাগ)"
+        "chakshu_cta": "নকল KYC / SIM / SMS স্ক্যাম Sanchar Saathi-এ রিপোর্ট করুন",
+        "raw_response": "র ড মডেল প্রতিক্রিয়া",
+        "upload_key": "User Gemini API Key (শুধু সেশন)",
+        "use_app_key": "Streamlit Secrets থেকে অ্যাপ-কী ব্যবহার করুন",
+        "login": "সাইন ইন (নক্সিক)",
+        "logout": "সাইন আউট",
+        "quantum_result": "কোয়ান্টাম পতন নির্দেশ করে:",
+        "safe": "নিরাপদ",
+        "scam": "ঠোকাঠাক",
+        "unknown": "সন্দেহজনক",
+        "social_tactics": "কী সামাজিক প্রকৌশল কৌশলগুলি সনাক্ত হয়েছে",
+        "matched_patterns": "মেলানো প্যাটার্ন",
     },
     "Tamil": {
-        "title": "🛡️ Bharat Suraksha AI — கையெழுத்து பாதுகாப்பு",
-        "subtitle": "சமூக பொறியியல் மற்றும் டிஜிட்டல் மோசடிகளிலிருந்து பாதுகாப்பு",
+        "title": "🛡️ Bharat Suraksha — சைபர் பாதுகாப்பு",
+        "subtitle": "சமூக பொறியியல், பிஷிங் மற்றும் இந்திய மோசடிகளை கண்டறிதல்",
         "paste_prompt": "சந்தேகமான செய்தி, SMS அல்லது WhatsApp உரையை இங்கே ஒட்டவும்:",
-        "scan_button": "🔍 மோசடி சோதிக்கவும்",
-        "analysis_result": "विश्लेषण முடிவு",
-        "emergency_action": "🚨 அவசர நடவடிக்கை",
-        "call_1930": "1930 ஹெல்ப்லைன் அழைப்பு",
-        "report_cyber": "Cybercrime.gov.in-ல் புகார் செய்யவும்",
-        "report_chakshu": "Chakshu-க்கு புகார் (Sanchar Saathi)",
-        "chakshu_cta": "ஓகே KYC / SIM / SMS மோசடிகளை Sanchar Saathi-க்கு புகார் செய்யவும்",
-        "analyzing": "டிஜிட்டல் தர்மா மூலம் பகுப்பாய்வு...",
-        "please_paste": "முதலில் ஒரு செய்தியை ஒட்டவும்!",
-        "upload_key": "உங்கள் User Gemini API Key வழங்கவும் (சேஷன் மட்டும்)",
-        "use_secrets": "Streamlit Secrets இல் இருந்து செயலி-அளவிலான திறவுகோலைப் பயன்படுத்தவும்",
-        "quantum_title": "குவாண்டம் 'டிஜிட்டல் தர்மா' சிமுலேஷன்",
-        "quantum_explain": "அனிசித்தலை காட்டுகிறது; இறுதி முடிவு AI நம்பிக்கையும் குவாண்டம் சிமுலேஷனையும் ஒன்றிணைக்கிறது.",
-        "raw_response": "அம்சப்பூர்வ ம��டல் பதில் (டைபக்)"
+        "scan_button": "🔍 分析 (ஆழமான நோக்கம்)",
+        "analysis_result": "விசாரணை முடிவு",
+        "analyzing_superposition": "சூப்பர்போசிஷன் ஆய்வு (குவாண்டம் டிஜிட்டல் தர்மா)...",
+        "please_paste": "தயவு செய்து முதலில் ஒரு செய்தியை ஒட்டவும்!",
+        "emergency_action": "🚨 அவசர நடவடிக்கைகள்",
+        "call_1930": "1930 ஹெல்ப்லைன் அழைக்கவும்",
+        "report_cyber": "Cybercrime.gov.in-க்கு புகார் செய்யவும்",
+        "report_chakshu": "Chakshu-க்கு புகார் செய்யவும் (Sanchar Saathi)",
+        "chakshu_cta": "மோசடியான KYC / SIM / SMS மோசடிகளை Sanchar Saathi-க்கு புகார் செய்யவும்",
+        "raw_response": "உறுதிப்படுத்தாத மாதிரி பதில்",
+        "upload_key": "User Gemini API Key (சேஷன் மட்டுமே)",
+        "use_app_key": "Streamlit Secrets இல் இருந்து செயலி-முக்கியத்தைப் பயன்படுத்தவும்",
+        "login": "உள்நுழைக (தற்காலிக)",
+        "logout": "வெளியேறு",
+        "quantum_result": "குவாண்டம் சரிவால் காட்டப்படுவது:",
+        "safe": "பாதுகாப்பானது",
+        "scam": "மோசடி",
+        "unknown": "இணைக்கபட்டது",
+        "social_tactics": "கட்டமைப்பு கண்டறியப்பட்ட சமூக பொறியியல் மோசடிகள்",
+        "matched_patterns": "பட்டர்ன்கள்",
     },
     "Telugu": {
-        "title": "🛡️ Bharat Suraksha AI — సైబర్ సెక్యూర్",
-        "subtitle": "సోషల్ ఇంజినీరింగ్ & డిజిటల్ స్కామ్‌ల నుండి రక్షణ",
+        "title": "🛡️ Bharat Suraksha — సైబర్ సెక్యూర్",
+        "subtitle": "సామాజిక ఇంజినీరింగ్, ఫిషింగ్ మరియు భారతీయ స్కామ్‌ల గుర్తింపు",
         "paste_prompt": "సందేహాస్పద సందేశం, SMS లేదా WhatsApp వచనం ఇక్కడ పేస్ట్ చేయండి:",
-        "scan_button": "🔍 స్కామ్ కోసం స్కాన్ చేయండి",
+        "scan_button": "🔍 విశ్లేషణ (డీప్ ఇన్టెంట్)",
         "analysis_result": "విశ్లేషణ ఫలితం",
-        "emergency_action": "🚨 అత్యవసర చర్య",
-        "call_1930": "1930 హెల్ప్‌లైన్‌కు కాల్ చేయండి",
-        "report_cyber": "Cybercrime.gov.inకి రిపోర్ట్ చేయండి",
-        "report_chakshu": "Chakshuకు రిపోర్ట్ చేయండి (Sanchar Saathi)",
-        "chakshu_cta": "నకిలీ KYC / SIM / SMS స్కామ్‌లను Sanchar Saathiలో రిపోర్ట్ చేయండి",
-        "analyzing": "డిజిటల్ ధర్మాతో విశ్లేషిస్తోంది...",
-        "please_paste": "దయచేసి ముందుగా ఒక సందేశాన్ని పేస్ట్ చేయండి!",
-        "upload_key": "మీ User Gemini API Key అందించండి (సెషన్ మాత్రమే)",
-        "use_secrets": "Streamlit Secrets నుండి యాప్-స్థాయి కీ ని ఉపయోగించండి",
-        "quantum_title": "క్వాంటమ్ 'డిజిటల్ ధర్మ' అనుకరణ",
-        "quantum_explain": "సూపర్‌పోజిషన్ చూపుతోంది; అఖిక ఫలితం AI నమ్మకంగా మరియు క్వాంటమ్ ఫలితాన్ని కలపడం.",
-        "raw_response": "రా మోడల్ స్పందన (డీబగ్గింగ్)"
-    }
+        "analyzing_superposition": "సూపర్ఫోజిషన్ విశ్లేషణ (క్వాంటమ్ డిజిటల్ ధర్మా)...",
+        "please_paste": "దయచేసి మొదట ఒక సందేశాన్ని పేస్ట్ చేయండి!",
+        "emergency_action": "🚨 అత్యవసర చర్యలు",
+        "call_1930": "1930 హెల్ప్‌లైన్��కు కాల్ చేయండి",
+        "report_cyber": "Cybercrime.gov.inకి నివేదించండి",
+        "report_chakshu": "Chakshuకి నివేదించండి (Sanchar Saathi)",
+        "chakshu_cta": "నకిలీ KYC / SIM / SMS స్కామ్‌లను Sanchar Saathiలో నివేదించండి",
+        "raw_response": "రా మోడల్ ప్రతిస్పందన",
+        "upload_key": "User Gemini API Key (సెషన్ మాత్రమే)",
+        "use_app_key": "Streamlit Secrets నుండి యాప్-స్థాయి కీ ఉపయోగించండి",
+        "login": "సైన్ ఇన్ (నకిలీ)",
+        "logout": "సైన్ అవుట్",
+        "quantum_result": "క్వాంటమ్ కollapse ఫలితం:",
+        "safe": "సురక్షితం",
+        "scam": "ఐన నకిలీ",
+        "unknown": "సందేహాస్పదం",
+        "social_tactics": "పాల్సిన సోషియల్ ఇంజినీరింగ్ తంత్రాలు",
+        "matched_patterns": "మ్యాచ్డ్ ప్యాటర్న్‌లు",
+    },
 }
 
-# -----------------------
-# SESSION STATE INIT
-# -----------------------
-def init_session():
+# ---------------------------
+# Session state initialization
+# ---------------------------
+def init_state():
     defaults = {
         "language": "English",
         "last_input": "",
         "last_parsed": None,
         "last_score": None,
         "user_api_key": None,
-        "logged_in_user": None,  # populate after OAuth
-        "quantum_state": None
+        "logged_in_user": None,
+        "quantum_result": None,
+        "is_processing": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
-init_session()
 
-# -----------------------
-# AUTHENTICATION / USER LOGIN (placeholder)
-# -----------------------
-def google_oauth_placeholder():
+init_state()
+
+# ---------------------------
+# Helper: Simulated login (placeholder)
+# ---------------------------
+def login_placeholder(labels: Dict[str, str]) -> None:
     """
-    Placeholder for Google OAuth integration.
-    Streamlit does not provide st.login() natively. For production, integrate:
-      - Authlib + Google OAuth2
-      - Or setup Identity Platform + reverse-proxy + secure JWT verification.
-    This function provides a simple simulated login UX to toggle "logged_in_user" session state.
+    Simulated login UI: sets st.session_state['logged_in_user'] to a fake value.
+    Replace with proper OAuth server-side flow in production.
     """
-    col1, col2 = st.sidebar.columns([3,1])
     if st.session_state.get("logged_in_user"):
-        col1.markdown(f"**User:** {st.session_state['logged_in_user']}")
-        if col2.button(MULTI[st.session_state["language"]]["logout"]):
+        st.sidebar.markdown(f"**User:** {st.session_state['logged_in_user']}")
+        if st.sidebar.button(labels["logout"]):
             st.session_state["logged_in_user"] = None
-            st.success("Signed out")
+            st.sidebar.success("Signed out")
     else:
-        if col1.button(MULTI[st.session_state["language"]]["login"]):
-            # Simulate sign-in (replace with real OAuth in production)
+        if st.sidebar.button(labels["login"]):
+            # simulate sign in for demo; in prod implement proper OAuth
             st.session_state["logged_in_user"] = "user@example.com"
-            st.success("Signed in as user@example.com")
-            # NOTE: After real OAuth, you SHOULD NOT store sensitive tokens in client-side session_state unencrypted.
+            st.sidebar.success("Signed in as user@example.com")
 
-# -----------------------
-# API KEY HANDLING (per-session)
-# -----------------------
-def get_effective_api_key():
+
+# ---------------------------
+# API key selection logic (priority)
+# ---------------------------
+def effective_api_key() -> Optional[str]:
     """
     Priority:
-      1) per-session user provided key (st.session_state['user_api_key'])
-      2) app-level key from st.secrets['GOOGLE_API_KEY']
-      3) None -> error
-    The user-provided key is stored only in session_state and is lost when session ends.
+      1. st.session_state['user_api_key'] (session-only, if provided)
+      2. st.secrets['GOOGLE_API_KEY'] (app-level secret)
     """
-    if st.session_state.get("user_api_key"):
-        return st.session_state["user_api_key"]
+    user_key = st.session_state.get("user_api_key")
+    if user_key:
+        return user_key
     return st.secrets.get("GOOGLE_API_KEY") if "GOOGLE_API_KEY" in st.secrets else None
 
-def user_key_input_ui(labels):
-    """
-    Sidebar control to allow a logged-in user to enter their own Gemini API key for the session.
-    If the user enters a key, it is stored only in st.session_state['user_api_key'].
-    Provide an option to use the app-level secret instead.
-    """
-    st.sidebar.write("---")
-    st.sidebar.markdown("### API Key (session)")
-    if st.session_state.get("logged_in_user"):
-        key = st.sidebar.text_input(labels["upload_key"], type="password", value=st.session_state.get("user_api_key") or "")
-        if key:
-            st.session_state["user_api_key"] = key.strip()
-            st.sidebar.success("User key stored for this session only.")
-        use_app = st.sidebar.checkbox(labels["use_secrets"], value=not bool(st.session_state.get("user_api_key")))
-        if use_app:
-            st.session_state["user_api_key"] = None
-    else:
-        st.sidebar.info("Sign in to provide a per-session API key.")
 
-# -----------------------
-# AI CONFIGURATION + ERROR HANDLING
-# -----------------------
-def configure_model_with_key(api_key: Optional[str]):
+# ---------------------------
+# Model configuration with error handling
+# ---------------------------
+def configure_model(api_key: Optional[str]):
     """
-    Configure google.generativeai with the provided api_key.
-    Wrap in try/except to avoid raising on configuration failure.
-    Returns a model object or None.
+    Configure google.generativeai safely. Returns a GenerativeModel instance or None.
     """
     if not api_key:
         st.error("No API key available. Add GOOGLE_API_KEY to Streamlit Secrets or provide a per-session key.")
         return None
     try:
         genai.configure(api_key=api_key)
-        # choose model family; allow fallback later if unavailable
         model = genai.GenerativeModel("gemini-1.5-flash")
         return model
     except Exception as e:
-        st.error(f"Failed to configure GenAI client: {e}")
+        st.error("Failed to configure GenAI client. Check key or network.")
+        # Do not reveal keys or stack traces to users; show minimal message.
         return None
 
-# -----------------------
-# PROMPT BUILDING (Advanced Forensic Investigator)
-# -----------------------
-def build_forensic_prompt(message: str, language: str) -> str:
+
+# ---------------------------
+# Advanced Forensic AI prompt builder
+# ---------------------------
+def build_deep_intent_prompt(message: str, language: str) -> str:
     """
-    Build an advanced prompt instructing the model to act as a Digital Forensic Investigator.
-    The model must return strict JSON only to ease parsing.
-    JSON schema requested:
-    {
-      "is_scam":"yes|no|suspect",
-      "score": int (0-100),
-      "explanations": {"en":"", "hi": "", "bn":"", ...},
-      "social_engineering_tactics": ["pretexting", "authority", ...],
-      "matched_patterns": ["KYC expiry", ...]
-    }
+    Build a 'Deep Intent Analysis' prompt instructing Gemini to act as a Digital Forensic Investigator.
+    Instructs returning a strict JSON object with fields:
+      is_scam: yes|no|suspect
+      score: int 0-100
+      explanations: {"en": "...", "hi": "...", ...} (if possible)
+      social_engineering_tactics: [ "urgency", "authority", "fear", "phishing", ... ]
+      matched_patterns: [...]
     """
     patterns = [
         "electricity bill disconnected",
         "KYC expiry",
         "WhatsApp job offer",
         "bank OTP request",
-        "refund/payment due",
-        "lottery/prize",
+        "refund / payment due",
+        "lottery / prize",
         "fake URL / short link",
-        "request to install app or share KYC",
-        "UPI/phone transfer request"
+        "request to install an app or share KYC"
     ]
     pattern_text = "; ".join(patterns)
-    instruct = (
-        f"You are a Digital Forensic Investigator specialized in Indian scam patterns. "
-        f"Analyze the message and return ONLY a JSON object matching the schema described below. "
-        f"Look explicitly for patterns: {pattern_text}. Provide social engineering tactics (e.g., authority, urgency, scarcity, pretexting, baiting). "
-        f"Provide concise explanations in multiple languages if possible. Provide an integer 'score' between 0 and 100 where 100 is certainly a scam.\n\n"
-        f"Message: \"\"\"{message}\"\"\"\n\n"
-        f"Return JSON only. Ensure the score is an integer."
-    )
-    return instruct
+    prompt = f"""
+You are a Digital Forensic Investigator specialized in scams in India. Analyze the following message for intent and social engineering tactics.
+Return ONLY a JSON object (no explanation text) with these fields:
+- is_scam: "yes"|"no"|"suspect"
+- score: integer 0-100 (100 => certain scam)
+- explanations: object with keys 'en' and 'hi' (English and Hindi concise explanations)
+- social_engineering_tactics: array of tactics detected (e.g., "urgency", "authority", "pretexting", "fear", "phishing", "baiting")
+- matched_patterns: array of pattern strings you matched (from known Indian tropes)
 
-# -----------------------
-# MODEL CALL + PARSING
-# -----------------------
+Look specifically for these tropes: {pattern_text}
+Message: \"\"\"{message}\"\"\"
+
+Ensure score is an integer and return valid JSON only.
+"""
+    return prompt
+
+
+# ---------------------------
+# Model call wrapper + robust parsing
+# ---------------------------
 def call_model_and_parse(model, prompt: str) -> Dict[str, Any]:
     """
-    Safe wrapper to call model.generate_content and parse a JSON response.
-    If the model fails or returns non-JSON, fallback to best-effort parsing.
+    Call model.generate_content with defensive error handling.
+    Try to extract JSON; fall back to safe heuristics.
     """
-    raw = ""
+    raw_text = ""
     try:
         response = model.generate_content(prompt)
-        # Extract text safely
+        # Extract text safely; the response object shape may vary by client version
         if hasattr(response, "text") and response.text:
-            raw = response.text
+            raw_text = response.text
         elif hasattr(response, "candidates") and response.candidates:
-            raw = getattr(response.candidates[0], "content", getattr(response.candidates[0], "text", str(response.candidates[0])))
+            first = response.candidates[0]
+            raw_text = getattr(first, "content", getattr(first, "text", str(first)))
         else:
-            raw = str(response)
+            raw_text = str(response)
     except Exception as e:
-        raw = json.dumps({"error": str(e)})
-        st.error("Failed to call the model. Using conservative suspect fallback.")
-    parsed = parse_model_response(raw)
-    parsed["raw"] = raw
+        # Keep error minimal for user, but include fallback raw JSON for debug
+        err_msg = {"error": "model_call_failed", "message": str(e)}
+        raw_text = json.dumps(err_msg)
+        st.error("AI call failed — showing conservative fallback.")
+    parsed = parse_model_response(raw_text)
+    parsed["raw"] = raw_text
     return parsed
+
 
 def parse_model_response(text: str) -> Dict[str, Any]:
     """
-    Attempt strict JSON load; fall back to regex extraction.
-    Expected fields: is_scam, score, explanations (dict), social_engineering_tactics (list), matched_patterns (list)
-    Returns a dict with normalized fields and safe defaults.
+    Parse the model's JSON response if possible. If not, attempt regex heuristics.
+    Returns normalized dictionary with defaults.
     """
     try:
         data = json.loads(text)
-        # normalize
         is_scam = data.get("is_scam", "suspect")
         score = int(data.get("score", 50))
         explanations = data.get("explanations", {})
@@ -354,157 +382,206 @@ def parse_model_response(text: str) -> Dict[str, Any]:
             "explanations": explanations,
             "tactics": tactics,
             "matched_patterns": matched,
-            "raw": text
+            "raw": text,
         }
     except Exception:
-        # fallback heuristics
-        score_match = re.search(r"(\b[0-9]{1,3}\b)\s*(%|percent)?", text)
+        # Fallback heuristics
         score = 50
-        if score_match:
+        m = re.search(r"(\b[0-9]{1,3}\b)\s*(%|percent)?", text)
+        if m:
             try:
-                c = int(score_match.group(1))
+                c = int(m.group(1))
                 if 0 <= c <= 100:
                     score = c
             except:
                 pass
         is_scam = "suspect"
-        if re.search(r"\b(scam|fraud|fake|malicious)\b", text, re.I):
+        if re.search(r"\b(scam|fraud|fake|malicious|phish)\b", text, re.I):
             is_scam = "yes"
-        elif re.search(r"\b(not a scam|safe|benign)\b", text, re.I):
+        elif re.search(r"\b(safe|benign|not a scam|trustworthy)\b", text, re.I):
             is_scam = "no"
-        known_patterns = ["electricity", "bill", "KYC", "job", "WhatsApp", "OTP", "link", "refund", "lottery", "prize", "UPI"]
-        matched = [p for p in known_patterns if re.search(p, text, re.I)]
+        # naive pattern detection
+        known = ["electricity", "bill", "KYC", "job", "WhatsApp", "OTP", "link", "refund", "lottery", "prize", "UPI"]
+        matched = [p for p in known if re.search(p, text, re.I)]
         return {
             "is_scam": is_scam,
             "score": score,
             "explanations": {"en": text},
             "tactics": [],
             "matched_patterns": matched,
-            "raw": text
+            "raw": text,
         }
 
-# -----------------------
-# RISK METER UTILITIES
-# -----------------------
-def risk_label_and_color(score: int):
-    """
-    Map score-> label & color. Keep consistent and documented here.
-    0-33: Safe (Green)
-    34-66: Suspect (Yellow)
-    67-100: Scam (Red)
-    """
-    if score <= 33:
-        return "Safe", "#2ecc71"
-    elif score <= 66:
-        return "Suspect", "#f1c40f"
-    else:
-        return "Scam", "#e74c3c"
 
-# -----------------------
-# QUANTUM 'DIGITAL DHARMA' SIMULATION
-# -----------------------
-def hadamard():
-    """2x2 Hadamard gate"""
+# ---------------------------
+# Quantum Digital Dharma Engine (qubit simulation)
+# ---------------------------
+def hadamard_matrix():
     return (1 / math.sqrt(2)) * np.array([[1, 1], [1, -1]], dtype=complex)
 
-def quantum_superposition_and_measure(model_score: int, seed: Optional[int] = None):
+
+def simulate_qubit_and_collapse(model_score: int, progress_callback=None, steps: int = 20, sleep_per_step: float = 0.03):
     """
-    Create a biased qubit state based on the model_score, apply Hadamard to show superposition, then measure.
-    model_score: 0..100 (higher => more likely 'scam')
-    Steps:
-      - map model_score to initial amplitude for |1> vs |0> as sqrt(p)
-      - apply H
-      - compute probabilities, sample measurement (collapse)
-    Returns dict with amplitudes, probabilities, measured_state (0 safe, 1 scam)
+    Simulate qubit |ψ> = α|0> + β|1> where |β|^2 ~= model_score/100.
+    - Show an 'Analyzing Superposition' progress via progress_callback (if provided).
+    - Apply Hadamard to generate superposition (visualized).
+    - Collapse (measure) using resulting probabilities.
+    Returns a dict with amplitudes, probabilities, and measured outcome (0 safe, 1 scam).
     """
-    # map score -> probability of |1> (scam) initially
+    # Map model score to initial probability of |1> (scam)
     p1 = np.clip(model_score / 100.0, 0.0, 1.0)
-    # amplitude vector (|0>, |1>) using square roots
     a0 = math.sqrt(max(0.0, 1 - p1))
     a1 = math.sqrt(max(0.0, p1))
-    state = np.array([[a0], [a1]], dtype=complex)
-    H = hadamard()
-    superposed = H @ state
-    probs = np.abs(superposed) ** 2
-    # Normalize probability just to be safe
-    probs = probs / np.sum(probs)
-    rng = np.random.default_rng(seed)
-    measured = rng.choice([0, 1], p=[float(probs[0]), float(probs[1])])
-    result = {
-        "initial_amplitudes": [float(np.round(a0.real, 4)), float(np.round(a1.real, 4))],
-        "superposed_amplitudes": [float(np.round(superposed[0].real, 4)), float(np.round(superposed[1].real, 4))],
-        "probabilities": [float(np.round(probs[0], 4)), float(np.round(probs[1], 4))],
-        "measured": measured  # 0 -> safe, 1 -> scam
-    }
-    return result
+    state = np.array([a0, a1], dtype=complex).reshape(2, 1)
 
-# -----------------------
-# RENDERING / UI
-# -----------------------
-def render_main_ui():
-    labels = MULTI[st.session_state["language"]]
+    # Animate progress bar (if callback provided)
+    if progress_callback:
+        for i in range(steps):
+            progress_callback((i + 1) / steps)
+            time.sleep(sleep_per_step)
+
+    # Apply Hadamard
+    H = hadamard_matrix()
+    superposed = H @ state
+    probs = np.abs(superposed.flatten()) ** 2
+    probs = probs / probs.sum()
+
+    # Random measurement
+    measured = np.random.choice([0, 1], p=[float(probs[0]), float(probs[1])])
+    return {
+        "initial_amplitudes": [float(round(a0, 4)), float(round(a1, 4))],
+        "superposed_amplitudes": [float(round(superposed[0].real, 4)), float(round(superposed[1].real, 4))],
+        "probabilities": [float(round(probs[0], 4)), float(round(probs[1], 4))],
+        "measured": int(measured),
+    }
+
+
+# ---------------------------
+# Risk label/color mapping
+# ---------------------------
+def risk_label_color(score: int):
+    if score <= 33:
+        return LANG[st.session_state["language"]]["safe"], "#39FF14"  # Neon green
+    elif score <= 66:
+        return LANG[st.session_state["language"]]["unknown"], "#FFD700"  # Golden-ish
+    else:
+        return LANG[st.session_state["language"]]["scam"], "#FF9933"  # Neon saffron
+
+
+# ---------------------------
+# UI: Sidebar controls (language, login, API key)
+# ---------------------------
+def sidebar_controls():
+    # Language toggle
+    lang = st.sidebar.selectbox("Language / भाषा", list(LANG.keys()), index=list(LANG.keys()).index(st.session_state["language"]))
+    st.session_state["language"] = lang
+    labels = LANG[lang]
+
+    st.sidebar.markdown("---")
+    # Simulated login
+    login_placeholder(labels)
+
+    st.sidebar.markdown("### API Key (session)")
+    if st.session_state.get("logged_in_user"):
+        # If logged in, allow user to paste a per-session API key (stored only in session_state)
+        key = st.sidebar.text_input(labels["upload_key"], type="password", value=st.session_state.get("user_api_key") or "")
+        if key:
+            st.session_state["user_api_key"] = key.strip()
+            st.sidebar.success("Key stored for this session only.")
+        use_app = st.sidebar.checkbox(labels["use_app_key"], value=not bool(st.session_state.get("user_api_key")))
+        if use_app:
+            st.session_state["user_api_key"] = None
+    else:
+        st.sidebar.info("Sign in to provide a per-session API key.")
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Resources")
+    st.sidebar.markdown(f"- [Cybercrime Portal](https://cybercrime.gov.in)")
+    st.sidebar.markdown(f"- [Sanchar Saathi (DoT)](https://sancharsaathi.gov.in)")
+
+
+# ---------------------------
+# Main analysis flow + UI
+# ---------------------------
+def run_analysis():
+    labels = LANG[st.session_state["language"]]
+
     # Title card
     st.markdown(f"<div class='glass'><h1 style='margin-bottom:6px'>{labels['title']}</h1><p style='margin-top:0;color:#cfe9ff'>{labels['subtitle']}</p></div>", unsafe_allow_html=True)
     st.write("")
 
-    # Two-column main area
     left, right = st.columns([2, 1])
 
     with left:
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
-        user_input = st.text_area(labels["paste_prompt"], value=st.session_state.get("last_input", ""), height=180)
-        st.session_state["last_input"] = user_input
+        user_text = st.text_area(labels["paste_prompt"], value=st.session_state.get("last_input", ""), height=170)
+        st.session_state["last_input"] = user_text
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # Scan button
-        if st.button(labels["scan_button"], key="scan", help="Launch forensic analysis", ):
-            if not user_input:
+        if st.button(labels["scan_button"]):
+            if not user_text:
                 st.warning(labels["please_paste"])
             else:
-                # Determine API key and configure model
-                api_key = get_effective_api_key()
-                model = configure_model_with_key(api_key)
-                if model:
-                    with st.spinner(labels["analyzing"]):
-                        prompt = build_forensic_prompt(user_input, st.session_state["language"])
-                        parsed = call_model_and_parse(model, prompt)
-                        st.session_state["last_parsed"] = parsed
-                        st.session_state["last_score"] = parsed.get("score", 50)
-                        # Quantum simulation using model score
-                        qres = quantum_superposition_and_measure(st.session_state["last_score"])
-                        st.session_state["quantum_state"] = qres
+                # Begin processing
+                st.session_state["is_processing"] = True
+                api_key = effective_api_key()
+                model = configure_model(api_key)
+                if not model:
+                    st.error("AI model unavailable. Check API key.")
+                    st.session_state["is_processing"] = False
+                    return
 
-                        render_analysis(parsed, qres)
-                else:
-                    st.error("AI model unavailable. Check API key and network.")
+                # Build prompt and call model
+                prompt = build_deep_intent_prompt(user_text, st.session_state["language"])
+                # Show Ashoka Chakra animation while calling model (visual)
+                with st.spinner("Contacting forensic AI..."):
+                    parsed = call_model_and_parse(model, prompt)
 
-        # If we have previous result and no new scan triggered, show persisted
-        if st.session_state.get("last_parsed") and not st.session_state.get("quantum_state"):
-            # Show previous analysis (no quantum collapse saved)
-            prev = st.session_state["last_parsed"]
-            qprev = quantum_superposition_and_measure(prev.get("score", 50))
-            st.session_state["quantum_state"] = qprev
-            render_analysis(prev, qprev)
+                # Keep parsed and score in session
+                st.session_state["last_parsed"] = parsed
+                st.session_state["last_score"] = parsed.get("score", 50)
 
-        elif st.session_state.get("last_parsed") and st.session_state.get("quantum_state"):
-            # Show last saved analysis (consistent across language switches)
-            render_analysis(st.session_state["last_parsed"], st.session_state["quantum_state"])
+                # Quantum superposition animation: progressive collapse
+                st.markdown("<div style='text-align:center'><div class='chakra'></div></div>", unsafe_allow_html=True)
+                prog = st.progress(0)
+                qres = simulate_qubit_and_collapse(st.session_state["last_score"], progress_callback=prog.progress, steps=30, sleep_per_step=0.03)
+                st.session_state["quantum_result"] = qres
+                st.session_state["is_processing"] = False
+
+                # Render results
+                render_results(parsed, qres)
+
+        # If previous results exist, show them (persistent across language toggle)
+        elif st.session_state.get("last_parsed"):
+            parsed = st.session_state["last_parsed"]
+            qres = st.session_state.get("quantum_result")
+            if not qres:
+                # Simulate a quantum run for display if not present
+                prog = st.progress(0)
+                qres = simulate_qubit_and_collapse(parsed.get("score", 50), progress_callback=prog.progress, steps=20, sleep_per_step=0.02)
+                st.session_state["quantum_result"] = qres
+            render_results(parsed, qres)
 
     with right:
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
-        st.markdown("### Session & Keys")
-        # Fake OAuth / login UX
-        google_oauth_placeholder()
-        user_key_input_ui(labels)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("### Session & Actions")
+        if st.session_state.get("logged_in_user"):
+            st.markdown(f"- Signed in as **{st.session_state['logged_in_user']}**")
+        else:
+            st.markdown("- Not signed in (use Sign in in sidebar)")
 
-        # Emergency & Chakshu Card
-        st.markdown("<div class='glass' style='margin-top:14px'>", unsafe_allow_html=True)
+        # Do NOT display API keys; only show whether user key is present
+        if st.session_state.get("user_api_key"):
+            st.markdown("- Per-session API key: **Provided**")
+        else:
+            st.markdown("- Per-session API key: **Not provided** (using app-level key if available)")
+
+        st.markdown("---")
         st.markdown(f"### {labels['emergency_action']}")
-        if st.button(labels["call_1930"], key="call1930"):
+        if st.button(labels["call_1930"]):
             st.write("📞 Dialing 1930...")
             st.markdown("[Click here to call 1930](tel:1930)")
-        if st.button(labels["report_cyber"], key="reportcyber"):
+        if st.button(labels["report_cyber"]):
             st.write("Redirecting to official portal...")
             st.markdown("[Visit Portal](https://cybercrime.gov.in)")
         st.markdown("---")
@@ -513,61 +590,62 @@ def render_main_ui():
         st.markdown("[Report on Sanchar Saathi (DoT)](https://sancharsaathi.gov.in)")
         st.markdown("</div>", unsafe_allow_html=True)
 
-def render_analysis(parsed: Dict[str, Any], qres: Dict[str, Any]):
-    labels = MULTI[st.session_state["language"]]
-    st.markdown("<div class='glass' style='margin-top:16px'>", unsafe_allow_html=True)
+
+# ---------------------------
+# Render analysis results
+# ---------------------------
+def render_results(parsed: Dict[str, Any], qres: Dict[str, Any]):
+    labels = LANG[st.session_state["language"]]
+    st.markdown("<div class='glass' style='margin-top:12px'>", unsafe_allow_html=True)
     st.markdown(f"## {labels['analysis_result']}")
 
     score = int(parsed.get("score", 50))
-    label, color = risk_label_and_color(score)
+    label, color = risk_label_color(score)
 
-    # Progress bar (0-100)
+    # Visual meter
     st.progress(score / 100)
 
-    # Colored badge
-    st.markdown(f"<div style='background:{color};padding:10px;border-radius:8px;color:#001010;font-weight:700;text-align:center'>{label} — Risk Score: {score}%</div>", unsafe_allow_html=True)
+    # Badge
+    st.markdown(f"<div class='badge' style='background:{color};'>{label} — Risk Score: {score}%</div>", unsafe_allow_html=True)
 
-    # Quantum superposition visualization (textual)
-    st.markdown(f"### {MULTI[st.session_state['language']]['quantum_title']}")
-    st.markdown(MULTI[st.session_state['language']]['quantum_explain'])
-    st.write("Initial amplitudes (|0>, |1>):", qres["initial_amplitudes"])
-    st.write("After Hadamard - superposed amplitudes:", qres["superposed_amplitudes"])
-    st.write("Probabilities (|0>, |1>):", qres["probabilities"])
-    st.write("Quantum collapse result:", "SCAM" if qres["measured"] == 1 else "SAFE")
+    # Quantum outcome
+    measured = qres.get("measured", 0) if qres else 0
+    measurement_text = labels["scam"] if measured == 1 else labels["safe"]
+    st.markdown(f"**{labels['quantum_result']}** {measurement_text}")
 
-    # Matched patterns and tactics
-    st.markdown("**Matched patterns:** " + (", ".join(parsed.get("matched_patterns", []) or ["None"]) ))
-    st.markdown("**Social Engineering Tactics detected:** " + (", ".join(parsed.get("tactics", []) or ["None"]) ))
+    # Qubit details
+    if qres:
+        st.write("Initial amplitudes (|0>, |1>):", qres["initial_amplitudes"])
+        st.write("Superposed amplitudes:", qres["superposed_amplitudes"])
+        st.write("Probabilities (|0>, |1>):", qres["probabilities"])
 
-    # Explanations (multilingual fallback)
-    exps = parsed.get("explanations", {})
-    # Try language-specific explanation
-    lang = st.session_state["language"]
-    if exps.get(lang[:2].lower()) or exps.get("en"):
-        st.markdown("**Explanation:**")
-        st.write(exps.get(lang[:2].lower(), exps.get("en", parsed.get("raw"))))
-    else:
-        st.write(exps or parsed.get("raw"))
+    # Patterns & tactics
+    matched = parsed.get("matched_patterns") or []
+    tactics = parsed.get("tactics") or parsed.get("social_engineering_tactics") or []
+    st.markdown(f"**{labels['matched_patterns']}:** " + (", ".join(matched) if matched else "None"))
+    st.markdown(f"**{labels['social_tactics']}:** " + (", ".join(tactics) if tactics else "None"))
 
-    # Raw for transparency
-    with st.expander(MULTI[st.session_state["language"]]["raw_response"]):
+    # Explanation: prefer language-specific explanation if available
+    explanations = parsed.get("explanations", {}) or {}
+    lang_code = st.session_state["language"][:2].lower()
+    explanation_text = explanations.get(lang_code) or explanations.get("en") or parsed.get("raw", "")
+    st.markdown("**Explanation:**")
+    st.write(explanation_text)
+
+    # Raw response (collapsible for auditors)
+    with st.expander(labels["raw_response"]):
         st.code(parsed.get("raw", ""))
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# -----------------------
-# LANGUAGE TOGGLE (instant update)
-# -----------------------
-def language_ui():
-    lang = st.sidebar.selectbox("Language / भाषा", list(MULTI.keys()), index=list(MULTI.keys()).index(st.session_state["language"]))
-    st.session_state["language"] = lang
 
-# -----------------------
-# ENTRYPOINT
-# -----------------------
+# ---------------------------
+# Entry point
+# ---------------------------
 def main():
-    language_ui()
-    render_main_ui()
+    sidebar_controls()
+    run_analysis()
+
 
 if __name__ == "__main__":
     main()
