@@ -1,2 +1,6 @@
 streamlit
 google-generativeai
+geocoder
+folium
+streamlit-folium
+pandas
