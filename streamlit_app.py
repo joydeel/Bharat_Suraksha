@@ -1,17 +1,3 @@
-```python name=streamlit_app.py url=https://github.com/joydeel/Bharat_Suraksha/blob/f1cb7877139e1cffc74ed3762a61ba02cfa4614f/streamlit_app.py
-# Refactored Streamlit app for "Bharat Suraksha AI"
-# - Per-session user Gemini API key (stored only in session_state)
-# - Google OAuth placeholder (instructions included)
-# - Quantum 'Digital Dharma' simulation using numpy
-# - Multilingual UI (English, Hindi, Bengali, Tamil, Telugu)
-# - Glassmorphism dark theme with neon accents
-# - Forensic Investigator AI prompt requesting JSON output
-#
-# IMPORTANT:
-# - Keep real API keys in Streamlit Secrets or environment variables.
-# - Per-session user keys are kept only in st.session_state and not written to disk.
-# - This code uses google-generativeai; adapt minor API shape differences if required.
-
 import json
 import re
 import math
