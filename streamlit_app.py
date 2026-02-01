@@ -14,4 +14,9 @@ if st.button("Analyze Intent"):
     response = model.generate_content(f"Is this an Indian scam? Explain in Hindi & English: {msg}")
     st.write(response.text)
     st.button("🚨 Call 1930 Helpline")
+st.sidebar.title("📖 How it Works")
+st.sidebar.info("1. Copy scam text\n2. AI checks 'Dharma' (Intent)\n3. Get Risk Score")
+
+st.sidebar.title("📖 How it Works")
+st.sidebar.info("1. Copy scam text\n2. AI checks 'Dharma' (Intent)\n3. Get Risk Score")
 
